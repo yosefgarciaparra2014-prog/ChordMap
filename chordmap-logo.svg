@@ -1,0 +1,46 @@
+<svg width="640" height="180" viewBox="0 0 640 180" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5a3a24"/>
+      <stop offset="100%" stop-color="#2a1c10"/>
+    </linearGradient>
+    <radialGradient id="dotGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f0a06a"/>
+      <stop offset="55%" stop-color="#d4622a"/>
+      <stop offset="100%" stop-color="#a8471c"/>
+    </radialGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1410"/>
+      <stop offset="100%" stop-color="#14100c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- badge / icono -->
+  <g transform="translate(16,16)">
+    <rect x="0" y="0" width="148" height="148" rx="34" fill="url(#badgeGrad)" stroke="#c9a13b" stroke-opacity="0.35" stroke-width="1.5"/>
+
+    <!-- mini mastil: 4 cuerdas horizontales, 3 trastes verticales -->
+    <g stroke="#e0c169" stroke-opacity="0.55">
+      <line x1="30" y1="46" x2="118" y2="46" stroke-width="2"/>
+      <line x1="30" y1="66" x2="118" y2="66" stroke-width="1.6"/>
+      <line x1="30" y1="86" x2="118" y2="86" stroke-width="1.6"/>
+      <line x1="30" y1="106" x2="118" y2="106" stroke-width="2"/>
+    </g>
+    <g stroke="#d9d2be" stroke-opacity="0.85">
+      <line x1="46" y1="38" x2="46" y2="114" stroke-width="3"/>
+      <line x1="74" y1="38" x2="74" y2="114" stroke-width="2"/>
+      <line x1="102" y1="38" x2="102" y2="114" stroke-width="2"/>
+    </g>
+
+    <!-- punto pisado -->
+    <circle cx="88" cy="86" r="10" fill="url(#dotGlow)"/>
+    <circle cx="88" cy="86" r="10" fill="none" stroke="#f5c99a" stroke-opacity="0.4" stroke-width="1"/>
+  </g>
+
+  <!-- wordmark -->
+  <g transform="translate(196,0)">
+    <text x="0" y="88" font-family="Fraunces, Georgia, 'Times New Roman', serif" font-size="58" font-weight="700" fill="#ede5d2">Chord</text>
+    <text x="164" y="88" font-family="Fraunces, Georgia, 'Times New Roman', serif" font-size="58" font-weight="600" font-style="italic" fill="#c9a13b">Map</text>
+    <text x="2" y="118" font-family="'JetBrains Mono','Courier New',monospace" font-size="13" letter-spacing="3.2" fill="#8c8172">ACORDES EN 3D PARA GUITARRA</text>
+  </g>
+</svg>

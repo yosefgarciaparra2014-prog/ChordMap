@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChordMap — Buscador de Acordes y Afinador</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #14100c;
+    --bg-panel: #1f1811;
+    --bg-panel-2: #251c14;
+    --wood: #5a3a24;
+    --wood-light: #7a5232;
+    --wood-dark: #3a2515;
+    --brass: #c9a13b;
+    --brass-light: #e0c169;
+    --string: #d9d2be;
+    --cream: #ede5d2;
+    --muted: #8c8172;
+    --press: #d4622a;
+    --open: #5b9e88;
+    --line: rgba(237,229,210,0.1);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(201,161,59,0.08), transparent 55%),
+      radial-gradient(ellipse at 100% 100%, rgba(90,58,36,0.25), transparent 60%),
+      var(--bg);
+    color:var(--cream);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:28px 16px 60px;
+  }
+  .app{ width:100%; max-width:920px; }
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.28em;
+    text-transform:uppercase;
+    color:var(--brass);
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .eyebrow::before{ content:""; width:22px;height:1px; background:var(--brass); display:inline-block; }
+  header{ display:flex; flex-direction:column; gap:14px; margin-bottom:8px; }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:clamp(28px,5vw,42px);
+    margin:0;
+    letter-spacing:-0.01em;
+    color:var(--cream);
+  }
+  h1 em{ font-style:italic; color:var(--brass-light); font-weight:400; }
+  .sub{ color:var(--muted); font-size:14px; max-width:56ch; line-height:1.5; margin:0; }
+
+  /* mode switcher (Buscador / Afinador) */
+  .mode-switch{
+    display:flex; gap:4px;
+    background:var(--bg-panel);
+    border-radius:12px; padding:4px;
+    width:fit-content;
+    border:1px solid var(--line);
+    margin:18px 0 22px;
+  }
+  .mode-btn{
+    font-family:'Inter',sans-serif; font-size:13.5px; font-weight:700;
+    color:var(--muted); background:transparent; border:none;
+    padding:10px 20px; border-radius:9px; cursor:pointer;
+    transition:all .15s ease;
+    display:flex; align-items:center; gap:7px;
+  }
+  .mode-btn.active{ background:var(--brass); color:#1c1509; }
+  .mode-btn svg{ width:15px; height:15px; }
+
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  /* ---- buscador ---- */
+  .search-row{ display:flex; gap:10px; margin-top:6px; flex-wrap:wrap; }
+  .pick-input{ position:relative; flex:1; min-width:220px; }
+  .pick-input input{
+    width:100%; background:var(--bg-panel);
+    border:1.5px solid rgba(201,161,59,0.35);
+    border-radius:14px 14px 14px 4px;
+    color:var(--cream); font-family:'Fraunces', serif;
+    font-size:22px; font-weight:600; padding:14px 18px; outline:none;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .pick-input input::placeholder{ color:var(--muted); font-weight:400; }
+  .pick-input input:focus{ border-color:var(--brass); box-shadow:0 0 0 4px rgba(201,161,59,0.12); }
+  .go-btn{
+    background:var(--brass); color:#1c1509; border:none; border-radius:12px;
+    padding:0 22px; font-family:'Inter',sans-serif; font-weight:700; font-size:14px;
+    letter-spacing:0.02em; cursor:pointer; transition:transform .12s ease, background .15s ease;
+  }
+  .go-btn:hover{ background:var(--brass-light); transform:translateY(-1px); }
+  .go-btn:active{ transform:translateY(0); }
+
+  .chip-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .chip{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--muted);
+    background:rgba(237,229,210,0.04); border:1px solid var(--line);
+    padding:5px 10px; border-radius:20px; cursor:pointer; transition:all .12s ease;
+  }
+  .chip:hover{ color:var(--cream); border-color:rgba(201,161,59,0.4); }
+
+  .hint-solfa{
+    font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--muted);
+    margin-top:10px; line-height:1.6;
+  }
+  .hint-solfa b{ color:var(--brass-light); font-weight:600; }
+
+  .error{
+    display:none; margin-top:14px; font-family:'JetBrains Mono', monospace; font-size:13px;
+    color:#e08a6b; background:rgba(212,98,42,0.08); border:1px solid rgba(212,98,42,0.3);
+    padding:10px 14px; border-radius:10px;
+  }
+
+  .result{ display:none; margin-top:26px; }
+  .chord-title{ display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:6px; }
+  .chord-title .name{
+    font-family:'Fraunces', serif; font-size:clamp(36px,7vw,56px); font-weight:700;
+    color:var(--brass-light); line-height:1;
+  }
+  .chord-title .quality{ font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--muted); letter-spacing:0.04em; }
+
+  .tabs{
+    display:flex; gap:4px; margin:18px 0 16px; background:var(--bg-panel);
+    border-radius:12px; padding:4px; width:fit-content; border:1px solid var(--line);
+  }
+  .tab{
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:600; color:var(--muted);
+    background:transparent; border:none; padding:9px 18px; border-radius:9px; cursor:pointer;
+    transition:all .15s ease;
+  }
+  .tab.active{ background:var(--wood); color:var(--cream); box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+  .tab-note{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--muted); margin:-8px 0 16px; }
+
+  .position-picker{
+    display:flex; gap:8px; flex-wrap:wrap; margin:-4px 0 16px;
+  }
+  .position-btn{
+    font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--muted);
+    background:rgba(237,229,210,0.035); border:1px solid var(--line);
+    border-radius:10px; padding:8px 11px; cursor:pointer; transition:all .12s ease;
+  }
+  .position-btn:hover{ color:var(--cream); border-color:rgba(201,161,59,0.45); }
+  .position-btn.active{ color:#1c1509; background:var(--brass-light); border-color:var(--brass-light); font-weight:700; }
+  .position-empty{
+    font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--muted);
+    padding:10px 12px; border:1px dashed var(--line); border-radius:10px;
+  }
+
+  .stage{ display:grid; grid-template-columns: 1.5fr 1fr; gap:18px; }
+  @media (max-width: 720px){ .stage{ grid-template-columns: 1fr; } }
+
+  .neck-panel{
+    background: linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
+    border:1px solid var(--line); border-radius:18px; overflow:hidden; position:relative; min-height:340px;
+  }
+  .neck-panel canvas{ display:block; touch-action:none; cursor:grab; }
+  .neck-panel canvas:active{ cursor:grabbing; }
+  .neck-hint{
+    position:absolute; bottom:10px; left:14px; font-family:'JetBrains Mono', monospace;
+    font-size:10.5px; color:rgba(237,229,210,0.35); pointer-events:none;
+  }
+  .fret-badge{
+    position:absolute; top:12px; left:14px; font-family:'JetBrains Mono', monospace; font-size:11px;
+    color:var(--brass-light); background:rgba(20,16,12,0.55); border:1px solid rgba(201,161,59,0.3);
+    padding:4px 10px; border-radius:20px;
+  }
+
+  .info-panel{
+    background: var(--bg-panel); border:1px solid var(--line); border-radius:18px; padding:18px;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .info-panel h3{
+    font-family:'Inter',sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 2px;
+  }
+  .string-list{ display:flex; flex-direction:column; gap:6px; font-family:'JetBrains Mono', monospace; font-size:13px; }
+  .string-row{ display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; background:rgba(237,229,210,0.02); }
+  .string-row .snum{ width:20px; color:var(--muted); font-size:11px; }
+  .string-row .sname{ width:26px; color:var(--cream); font-weight:700; }
+  .string-row .sval{ flex:1; color:var(--cream); }
+  .string-row.muted .sval{ color:var(--muted); }
+  .string-row .finger{
+    width:20px;height:20px; border-radius:50%; background:var(--press); color:#1c1509;
+    font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .string-row.open .finger{ background:transparent; border:1.5px solid var(--open); color:var(--open); }
+  .string-row.muted .finger{ background:transparent; color:var(--muted); }
+  .divider{ height:1px; background:var(--line); margin:2px 0; }
+  .legend{ font-size:11.5px; color:var(--muted); line-height:1.7; }
+
+  .empty-state{ margin-top:60px; text-align:center; color:var(--muted); }
+  .empty-state .big{ font-family:'Fraunces', serif; font-size:20px; color:var(--cream); margin-bottom:8px; }
+  .empty-state p{ font-size:13px; max-width:40ch; margin:0 auto; }
+
+  /* ---- afinador ---- */
+  .tuner-wrap{
+    display:flex; flex-direction:column; align-items:center; gap:26px;
+    background: linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
+    border:1px solid var(--line); border-radius:22px; padding:36px 24px; margin-top:12px;
+  }
+  .tuner-start{
+    display:flex; flex-direction:column; align-items:center; gap:14px; padding:30px 0;
+  }
+  .tuner-start p{ color:var(--muted); font-size:13px; text-align:center; max-width:38ch; margin:0; }
+  .mic-btn{
+    background:var(--brass); color:#1c1509; border:none; border-radius:14px;
+    padding:14px 26px; font-family:'Inter',sans-serif; font-weight:700; font-size:14.5px;
+    cursor:pointer; display:flex; align-items:center; gap:10px; transition:all .15s ease;
+  }
+  .mic-btn:hover{ background:var(--brass-light); transform:translateY(-1px); }
+  .mic-btn svg{ width:18px; height:18px; }
+
+  .tuner-active{ display:none; flex-direction:column; align-items:center; gap:22px; width:100%; }
+  .tuner-active.on{ display:flex; }
+  .tuner-start.off{ display:none; }
+
+  .target-string-row{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  .string-pill{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--muted);
+    border:1.5px solid var(--line); padding:7px 13px; border-radius:20px; transition:all .15s ease;
+  }
+  .string-pill.active-target{ color:#1c1509; background:var(--brass-light); border-color:var(--brass-light); font-weight:700; }
+
+  .note-display{ text-align:center; }
+  .note-display .big-note{
+    font-family:'Fraunces', serif; font-weight:700; font-size:clamp(60px,14vw,96px);
+    color:var(--cream); line-height:1; transition:color .15s ease;
+  }
+  .note-display .big-note.in-tune{ color:var(--open); }
+  .note-display .sub-note{
+    font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--muted); margin-top:6px;
+  }
+
+  .gauge{ width:100%; max-width:420px; }
+  .gauge svg{ width:100%; height:auto; display:block; }
+  .gauge-caption{
+    display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace;
+    font-size:11px; color:var(--muted); margin-top:4px; max-width:420px; width:100%;
+  }
+
+  .tuner-status{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--muted);
+    min-height:18px; text-align:center;
+  }
+  .stop-btn{
+    background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:10px;
+    padding:9px 18px; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; cursor:pointer;
+    transition:all .15s ease;
+  }
+  .stop-btn:hover{ color:var(--cream); border-color:rgba(237,229,210,0.3); }
+
+  footer{
+    margin-top:40px; text-align:center; font-family:'JetBrains Mono', monospace; font-size:11px;
+    color:var(--muted); letter-spacing:0.04em;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="eyebrow">ChordMap</span>
+    <h1>Escribe un acorde,<br><em>mira dónde pisar.</em></h1>
+    <p class="sub">Formas simplificadas para empezar y formas completas (con cejilla) para cuando quieras subir de nivel — todo sobre un mástil en 3D que puedes rotar. Incluye afinador.</p>
+  </header>
+
+  <div class="mode-switch">
+    <button class="mode-btn active" id="modeChords" data-mode="chords">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16M16 4v16"/></svg>
+      Buscador de acordes
+    </button>
+    <button class="mode-btn" id="modeTuner" data-mode="tuner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><circle cx="12" cy="18" r="3"/><path d="M12 3l6 3M12 3L6 6"/></svg>
+      Afinador
+    </button>
+  </div>
+
+  <!-- ========== VISTA: BUSCADOR ========== -->
+  <div class="view active" id="viewChords">
+    <div class="search-row">
+      <div class="pick-input">
+        <input id="chordInput" type="text" placeholder="Ej: Cmaj7, Solm7, Re7, Si#..." autocomplete="off" spellcheck="false">
+      </div>
+      <button class="go-btn" id="goBtn">Ver acorde</button>
+    </div>
+    <div class="chip-row" id="chipRow"></div>
+    <div class="hint-solfa">Puedes escribir en cifrado americano (<b>C D E F G A B</b>) o en solfeo (<b>do re mi fa sol la si</b>) · sostenido = <b>#</b> · bemol = <b>b</b> · calidades: <b>m, 7, maj7, m7, dim, dim7, m7b5, aug, sus2, sus4, 6, 9, maj9, m9, add9, 11, 13...</b> · ej: <b>Cdim7</b>, <b>Am7b5</b>, <b>G9</b></div>
+    <div class="error" id="errorBox"></div>
+
+    <div class="empty-state" id="emptyState">
+      <div class="big">Sin acorde todavía</div>
+      <p>Escribe el nombre de un acorde arriba o toca uno de los ejemplos para ver sus formas en el mástil.</p>
+    </div>
+
+    <div class="result" id="result">
+      <div class="chord-title">
+        <span class="name" id="chordName">Cmaj7</span>
+        <span class="quality" id="chordQuality">nota do · séptima mayor</span>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-mode="simple" id="tabSimple">Simplificada</button>
+        <button class="tab" data-mode="full" id="tabFull">Normal</button>
+      </div>
+      <div class="tab-note" id="tabNote"></div>
+      <div class="position-picker" id="positionPicker" aria-label="Posiciones fáciles"></div>
+
+      <div class="stage">
+        <div class="neck-panel" id="neckPanel">
+          <span class="fret-badge" id="fretBadge">traste 0</span>
+          <span class="neck-hint">arrastra para rotar</span>
+        </div>
+        <div class="info-panel">
+          <h3>Cuerdas · de grave a aguda</h3>
+          <div class="string-list" id="stringList"></div>
+          <div class="divider"></div>
+          <div class="legend">
+            <span style="color:var(--press)">●</span> pisar &nbsp;
+            <span style="color:var(--open)">○</span> al aire &nbsp;
+            <span style="color:var(--muted)">×</span> no tocar
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== VISTA: AFINADOR ========== -->
+  <div class="view" id="viewTuner">
+    <div class="tuner-wrap">
+      <div class="tuner-start" id="tunerStart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#c9a13b" stroke-width="1.6" width="46" height="46"><path d="M12 3v12"/><circle cx="12" cy="18" r="3.4"/><path d="M12 3c-3 0-5 2-5 4.5S9 12 12 12s5-2 5-4.5S15 3 12 3z"/></svg>
+        <p>Activa el micrófono y toca una cuerda. ChordMap detecta la nota y te dice si está afinada, alta o baja, comparándola contra la afinación estándar E A D G B e.</p>
+        <button class="mic-btn" id="micBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
+          Activar micrófono
+        </button>
+      </div>
+
+      <div class="tuner-active" id="tunerActive">
+        <div class="target-string-row" id="targetStringRow"></div>
+
+        <div class="note-display">
+          <div class="big-note" id="bigNote">—</div>
+          <div class="sub-note" id="subNote">esperando sonido...</div>
+        </div>
+
+        <div class="gauge">
+          <svg viewBox="0 0 420 130" id="gaugeSvg">
+            <path d="M 30 120 A 180 180 0 0 1 390 120" fill="none" stroke="rgba(237,229,210,0.12)" stroke-width="10" stroke-linecap="round"/>
+            <path d="M 175 120 A 30 30 0 0 1 245 120" fill="none" stroke="#5b9e88" stroke-width="10" stroke-linecap="round" opacity="0.55"/>
+            <line x1="210" y1="118" x2="210" y2="26" stroke="#ede5d2" stroke-width="2.5" stroke-dasharray="1,7" stroke-linecap="round" opacity="0.55"/>
+            <line x1="210" y1="120" x2="210" y2="30" stroke="#d4622a" stroke-width="4" stroke-linecap="round" id="needle" style="transform-origin: 210px 120px; transform: rotate(0deg); transition: transform .12s ease;"/>
+            <circle cx="210" cy="120" r="7" fill="#d4622a" id="needleHub"/>
+          </svg>
+          <div class="gauge-caption"><span>♭ baja</span><span>afinada</span><span>alta ♯</span></div>
+        </div>
+
+        <div class="tuner-status" id="tunerStatus">Escuchando...</div>
+        <button class="stop-btn" id="stopBtn">Detener micrófono</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>MÁSTIL · 6 CUERDAS · AFINACIÓN ESTÁNDAR E A D G B E</footer>
+</div>
+
+<script>
+  function loadScript(src){
+    return new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = src; s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  window.__threeReady = loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js')
+    .catch(()=> loadScript('https://unpkg.com/three@0.128.0/build/three.min.js'))
+    .catch(()=> loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'))
+    .then(()=>true)
+    .catch(()=>false);
+</script>
+<script>
+/* ============ MODE SWITCH ============ */
+const viewChords = document.getElementById('viewChords');
+const viewTuner = document.getElementById('viewTuner');
+const modeChords = document.getElementById('modeChords');
+const modeTuner = document.getElementById('modeTuner');
+modeChords.onclick = ()=>{
+  modeChords.classList.add('active'); modeTuner.classList.remove('active');
+  viewChords.classList.add('active'); viewTuner.classList.remove('active');
+};
+modeTuner.onclick = ()=>{
+  modeTuner.classList.add('active'); modeChords.classList.remove('active');
+  viewTuner.classList.add('active'); viewChords.classList.remove('active');
+};
+
+/* ============ TEORÍA DE ACORDES ============ */
+const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const FLAT_TO_SHARP = {'Db':'C#','Eb':'D#','Gb':'F#','Ab':'G#','Bb':'A#','Cb':'B','Fb':'E'};
+const NOTE_LABEL_ES = {'C':'do','C#':'do#','D':'re','D#':'re#','E':'mi','F':'fa','F#':'fa#','G':'sol','G#':'sol#','A':'la','A#':'la#','B':'si'};
+const SOLFEGE_TO_LETTER = {do:'C', re:'D', mi:'E', fa:'F', sol:'G', la:'A', si:'B'};
+
+const QUALITY_ALIASES = {
+  '': 'maj', 'maj': 'maj', 'major': 'maj', 'M': 'maj',
+  'm': 'm', 'min': 'm', 'minor': 'm', '-': 'm',
+  '5': '5',
+  '6': '6', 'maj6': '6',
+  'm6': 'm6', 'min6': 'm6',
+  '6/9': '6/9', '69': '6/9',
+  '7': '7', 'dom7': '7',
+  'maj7': 'maj7', 'M7': 'maj7', 'Δ7': 'maj7', 'Δ': 'maj7',
+  'm7': 'm7', 'min7': 'm7', '-7': 'm7',
+  'mmaj7': 'mmaj7', 'mM7': 'mmaj7', 'm(maj7)': 'mmaj7', '-maj7': 'mmaj7',
+  'dim': 'dim', '°': 'dim', 'o': 'dim',
+  'dim7': 'dim7', '°7': 'dim7', 'o7': 'dim7',
+  'm7b5': 'm7b5', 'm7-5': 'm7b5', 'ø': 'm7b5', 'ø7': 'm7b5', 'half-dim': 'm7b5',
+  'aug': 'aug', '+': 'aug',
+  'aug7': 'aug7', '+7': 'aug7',
+  'sus2': 'sus2',
+  'sus4': 'sus4', 'sus': 'sus4',
+  '7sus4': '7sus4', '7sus': '7sus4',
+  '9': '9',
+  'maj9': 'maj9', 'M9': 'maj9',
+  'm9': 'm9', 'min9': 'm9',
+  'add9': 'add9',
+  '11': '11',
+  'm11': 'm11', 'min11': 'm11',
+  '13': '13',
+  '7b5': '7b5', '7-5': '7b5',
+  '7#5': '7#5', '7+5': '7#5',
+  '7b9': '7b9', '7-9': '7b9',
+  '7#9': '7#9', '7+9': '7#9'
+};
+const QUALITY_LABEL_ES = {
+  maj:'mayor', m:'menor', '5':'power chord (5ta)', '6':'sexta', m6:'sexta menor', '6/9':'sexta con novena',
+  '7':'séptima dominante', maj7:'séptima mayor', m7:'séptima menor', mmaj7:'menor con séptima mayor',
+  dim:'disminuido', dim7:'séptima disminuida', m7b5:'semidisminuido (m7b5)',
+  aug:'aumentado', aug7:'aumentado con séptima',
+  sus2:'suspendida 2', sus4:'suspendida 4', '7sus4':'séptima suspendida',
+  '9':'novena dominante', maj9:'novena mayor', m9:'novena menor', add9:'add nueve',
+  '11':'oncena', m11:'oncena menor', '13':'trecena',
+  '7b5':'séptima con 5ta disminuida', '7#5':'séptima con 5ta aumentada',
+  '7b9':'séptima con 9na menor', '7#9':'séptima con 9na aumentada'
+};
+
+// fórmulas de acordes en semitonos desde la raíz — de aquí se calcula CUALQUIER forma
+const CHORD_FORMULAS = {
+  maj:[0,4,7], m:[0,3,7], '5':[0,7],
+  '6':[0,4,7,9], m6:[0,3,7,9], '6/9':[0,4,7,9,14],
+  '7':[0,4,7,10], maj7:[0,4,7,11], m7:[0,3,7,10], mmaj7:[0,3,7,11],
+  dim:[0,3,6], dim7:[0,3,6,9], m7b5:[0,3,6,10],
+  aug:[0,4,8], aug7:[0,4,8,10],
+  sus2:[0,2,7], sus4:[0,5,7], '7sus4':[0,5,7,10],
+  '9':[0,4,7,10,14], maj9:[0,4,7,11,14], m9:[0,3,7,10,14], add9:[0,4,7,14],
+  '11':[0,4,7,10,14,17], m11:[0,3,7,10,14,17], '13':[0,4,7,10,14,21],
+  '7b5':[0,4,6,10], '7#5':[0,4,8,10], '7b9':[0,4,7,10,13], '7#9':[0,4,7,10,15]
+};
+
+// semitono de cada cuerda al aire: E A D G B e
+const OPEN_STRING_PC = [4,9,2,7,11,4];
+function pitchClass(stringIdx, fret){ return ((OPEN_STRING_PC[stringIdx]+fret)%12+12)%12; }
+
+// curated open ("simplificada" tradicional) chord shapes para notas naturales. key = root + quality
+const OPEN_CHORDS = {
+  'C_maj':  {frets:[null,3,2,0,1,0], fingers:[null,3,2,null,1,null]},
+  'C_7':    {frets:[null,3,2,3,1,0], fingers:[null,3,2,4,1,null]},
+  'C_maj7': {frets:[null,3,2,0,0,0], fingers:[null,3,2,null,null,null]},
+  'D_maj':  {frets:[null,null,0,2,3,2], fingers:[null,null,null,1,3,2]},
+  'D_m':    {frets:[null,null,0,2,3,1], fingers:[null,null,null,2,3,1]},
+  'D_7':    {frets:[null,null,0,2,1,2], fingers:[null,null,null,3,1,2]},
+  'D_maj7': {frets:[null,null,0,2,2,2], fingers:[null,null,null,1,2,3]},
+  'D_m7':   {frets:[null,null,0,2,1,1], fingers:[null,null,null,2,1,1]},
+  'D_sus2': {frets:[null,null,0,2,3,0], fingers:[null,null,null,1,2,null]},
+  'D_sus4': {frets:[null,null,0,2,3,3], fingers:[null,null,null,1,2,3]},
+  'E_maj':  {frets:[0,2,2,1,0,0], fingers:[null,2,3,1,null,null]},
+  'E_m':    {frets:[0,2,2,0,0,0], fingers:[null,2,3,null,null,null]},
+  'E_7':    {frets:[0,2,0,1,0,0], fingers:[null,2,null,1,null,null]},
+  'E_maj7': {frets:[0,2,1,1,0,0], fingers:[null,3,1,2,null,null]},
+  'E_m7':   {frets:[0,2,0,0,0,0], fingers:[null,2,null,null,null,null]},
+  'E_sus4': {frets:[0,2,2,2,0,0], fingers:[null,2,3,4,null,null]},
+  'F_maj':  {frets:[null,null,3,2,1,1], fingers:[null,null,3,2,1,1]},
+  'F_maj7': {frets:[null,null,3,2,1,0], fingers:[null,null,3,2,1,null]},
+  'G_maj':  {frets:[3,2,0,0,0,3], fingers:[2,1,null,null,null,3]},
+  'G_7':    {frets:[3,2,0,0,0,1], fingers:[3,2,null,null,null,1]},
+  'A_maj':  {frets:[null,0,2,2,2,0], fingers:[null,null,1,2,3,null]},
+  'A_m':    {frets:[null,0,2,2,1,0], fingers:[null,null,2,3,1,null]},
+  'A_7':    {frets:[null,0,2,0,2,0], fingers:[null,null,2,null,3,null]},
+  'A_maj7': {frets:[null,0,2,1,2,0], fingers:[null,null,3,1,2,null]},
+  'A_m7':   {frets:[null,0,2,0,1,0], fingers:[null,null,2,null,1,null]},
+  'A_sus2': {frets:[null,0,2,2,0,0], fingers:[null,null,1,2,null,null]},
+  'A_sus4': {frets:[null,0,2,2,3,0], fingers:[null,null,1,2,3,null]},
+  'B_7':    {frets:[null,2,1,2,0,2], fingers:[null,2,1,3,null,4]}
+};
+
+function parseChord(raw){
+  const s = raw.trim();
+  if(!s) return null;
+  const m = s.match(/^(do|re|mi|fa|sol|la|si|[A-G])([#b]?)(.*)$/i);
+  if(!m) return null;
+  const token = m[1].toLowerCase();
+  let letterRoot = SOLFEGE_TO_LETTER[token] || token.toUpperCase();
+  let acc = (m[2]||'').toLowerCase();
+  let qualRaw = m[3].trim();
+  let root = letterRoot;
+  if(acc === 'b'){
+    root = FLAT_TO_SHARP[root+'b'] || root;
+  } else if(acc === '#'){
+    root = root+'#';
+    if(!NOTES.includes(root)) return null;
+  }
+  const rootIdx = NOTES.indexOf(root);
+  if(rootIdx === -1) return null;
+  const qualKey = QUALITY_ALIASES[qualRaw];
+  if(qualKey === undefined) return null;
+  const displayAcc = acc==='b' ? 'b' : (acc==='#' ? '#' : '');
+  const displayRoot = (SOLFEGE_TO_LETTER[token] ? token[0].toUpperCase()+token.slice(1) : letterRoot) + displayAcc;
+  return {root, rootIdx, quality: qualKey, qualRaw, displayRoot};
+}
+
+// Dedos para formas sin cejilla: cada traste pisado usa un dedo distinto.
+function autoFingers(actualFrets){
+  const distinct = [...new Set(actualFrets.filter(f=>f!==null && f>0))].sort((a,b)=>a-b);
+  return actualFrets.map(f=>{
+    if(f===null || f===0) return null;
+    const rank = distinct.indexOf(f)+1;
+    return Math.min(rank,4);
+  });
+}
+
+// Dedos para formas normales con cejilla.
+function autoFingersBarre(actualFrets, baseFret){
+  const higher = [...new Set(actualFrets.filter(f=>f!==null && f>baseFret && f>0))].sort((a,b)=>a-b);
+  return actualFrets.map(f=>{
+    if(f===null || f===0) return null;
+    if(f===baseFret) return 1;
+    const rank = higher.indexOf(f)+2;
+    return Math.min(rank,4);
+  });
+}
+
+function scanVoicing(rootIdx, formula, stringIndices, baseFret, window){
+  const tones = new Set(formula.map(iv => (rootIdx+iv)%12));
+  const out = {};
+  stringIndices.forEach(s=>{
+    let chosen = null;
+    for(let f=baseFret; f<=baseFret+window; f++){
+      if(tones.has(pitchClass(s,f))){ chosen = f; break; }
+    }
+    out[s] = chosen;
+  });
+  return out;
+}
+
+function buildNormalVoicing(rootIdx, formula){
+  const fE = ((rootIdx-4)%12+12)%12;
+  const fA = ((rootIdx-9)%12+12)%12;
+  const baseFret = Math.min(fE, fA);
+  const window = formula.length>=5 ? 5 : 4;
+  const raw = scanVoicing(rootIdx, formula, [0,1,2,3,4,5], baseFret, window);
+  const frets = [0,1,2,3,4,5].map(s=> raw[s]===undefined ? null : raw[s]);
+  return {frets, barreFret: baseFret};
+}
+
+// Busca varias posiciones fáciles SIN CEJILLA.
+// Regla: máximo 4 dedos, nunca dos cuerdas en el mismo traste y máximo 3 trastes de extensión.
+// Se limita a 0-12 para que sea rápido y realmente útil para un principiante.
+function findEasyPositions(rootIdx, formula){
+  const tones = new Set(formula.map(iv => (rootIdx+iv)%12));
+  const rootPc = rootIdx;
+  const candidates = [];
+
+  for(let base=0; base<=12; base++){
+    const maxFret = Math.min(15, base+3);
+    const options = [];
+    for(let s=0;s<6;s++){
+      const arr=[null];
+      if(base===0 && tones.has(pitchClass(s,0))) arr.push(0);
+      for(let f=Math.max(1,base); f<=maxFret; f++){
+        if(tones.has(pitchClass(s,f))) arr.push(f);
+      }
+      options.push([...new Set(arr)]);
+    }
+
+    const shape = [null,null,null,null,null,null];
+    const usedFrets = new Set();
+    let count=0;
+
+    function walk(s){
+      if(candidates.length>120) return;
+      if(s===6){
+        const sounding=shape.filter(f=>f!==null).length;
+        const fretted=shape.filter(f=>f!==null && f>0).length;
+        const uniqueTones=new Set(shape.map((f,i)=>f===null?null:pitchClass(i,f)).filter(x=>x!==null));
+        const hasRoot=shape.some((f,i)=>f!==null && pitchClass(i,f)===rootPc);
+        if(sounding<3 || fretted>4 || uniqueTones.size<2 || !hasRoot) return;
+        candidates.push({frets:shape.slice(), fretted, sounding, uniqueTones:uniqueTones.size, hasRoot, base});
+        return;
+      }
+      for(const f of options[s]){
+        if(f!==null && f>0){
+          if(usedFrets.has(f)) continue; // evita mini-cejilla
+          usedFrets.add(f);
+          shape[s]=f;
+          walk(s+1);
+          usedFrets.delete(f);
+        } else {
+          shape[s]=f;
+          walk(s+1);
+        }
+      }
+      shape[s]=null;
+    }
+    walk(0);
+  }
+
+  // Puntúa: menos dedos y más cuerdas al aire primero; luego raíz y cantidad de notas.
+  candidates.sort((a,b)=>{
+    const scoreA = a.fretted*18 - a.sounding*7 - (a.base===0?12:0) - a.uniqueTones*4;
+    const scoreB = b.fretted*18 - b.sounding*7 - (b.base===0?12:0) - b.uniqueTones*4;
+    return scoreA-scoreB;
+  });
+
+  const seen=new Set();
+  const out=[];
+  for(const c of candidates){
+    const key=c.frets.join(',');
+    if(seen.has(key)) continue;
+    seen.add(key);
+    const frettedFrets=c.frets.filter(f=>f!==null && f>0);
+    const minF=frettedFrets.length ? Math.min(...frettedFrets) : 0;
+    const maxF=frettedFrets.length ? Math.max(...frettedFrets) : 0;
+    out.push({
+      frets:c.frets,
+      fingers:autoFingers(c.frets),
+      barreFret:minF,
+      positionStart:minF,
+      positionEnd:maxF || 3,
+      fretted:c.fretted,
+      sounding:c.sounding
+    });
+    if(out.length>=8) break;
+  }
+  return out;
+}
+
+function buildShape(rootIdx, quality){
+  const formula = CHORD_FORMULAS[quality];
+  const normalV = buildNormalVoicing(rootIdx, formula);
+  const normal = {frets:normalV.frets, fingers:autoFingersBarre(normalV.frets, normalV.barreFret), barreFret:normalV.barreFret};
+  const simplePositions = findEasyPositions(rootIdx, formula);
+  return {normal, simplePositions};
+}
+
+/* ============ ESTADO / UI BUSCADOR ============ */
+const STRING_NAMES = ['E','A','D','G','B','e'];
+const el = {
+  input: document.getElementById('chordInput'),
+  go: document.getElementById('goBtn'),
+  chips: document.getElementById('chipRow'),
+  error: document.getElementById('errorBox'),
+  empty: document.getElementById('emptyState'),
+  result: document.getElementById('result'),
+  chordName: document.getElementById('chordName'),
+  chordQuality: document.getElementById('chordQuality'),
+  tabSimple: document.getElementById('tabSimple'),
+  tabFull: document.getElementById('tabFull'),
+  tabNote: document.getElementById('tabNote'),
+  stringList: document.getElementById('stringList'),
+  fretBadge: document.getElementById('fretBadge'),
+  positionPicker: document.getElementById('positionPicker')
+};
+
+const EXAMPLES = ['Cmaj7','Solm7','Fa#','Sib7','Cdim7','Am7b5','G9','Dadd9','C13'];
+EXAMPLES.forEach(ex=>{
+  const c = document.createElement('button');
+  c.className='chip'; c.textContent=ex; c.type='button';
+  c.onclick = ()=>{ el.input.value = ex; handleSearch(); };
+  el.chips.appendChild(c);
+});
+
+let currentChord = null;
+let currentMode = 'simple';
+let currentSimpleIndex = 0;
+
+function handleSearch(){
+  const val = el.input.value;
+  const parsed = parseChord(val);
+  el.error.style.display='none';
+  if(!parsed){
+    el.error.textContent = 'No reconozco ese acorde. Prueba con cifrado americano ("Cmaj7", "Adim7") o solfeo ("Solm7", "Fa#", "Sib7").';
+    el.error.style.display='block';
+    el.result.style.display='none';
+    el.empty.style.display='block';
+    return;
+  }
+  const shape = buildShape(parsed.rootIdx, parsed.quality);
+  currentChord = {parsed, shape};
+  currentMode = 'simple';
+  currentSimpleIndex = 0;
+  el.tabSimple.classList.add('active');
+  el.tabFull.classList.remove('active');
+  el.empty.style.display='none';
+  el.result.style.display='block';
+  el.chordName.textContent = parsed.displayRoot + (parsed.qualRaw || '');
+  el.chordQuality.textContent = 'nota ' + NOTE_LABEL_ES[parsed.root] + ' · ' + (QUALITY_LABEL_ES[parsed.quality]||'');
+  render();
+}
+
+el.tabSimple.onclick = ()=>{ currentMode='simple'; el.tabSimple.classList.add('active'); el.tabFull.classList.remove('active'); render(); };
+el.tabFull.onclick = ()=>{ currentMode='full'; el.tabFull.classList.add('active'); el.tabSimple.classList.remove('active'); render(); };
+el.go.onclick = handleSearch;
+el.input.addEventListener('keydown', e=>{ if(e.key==='Enter') handleSearch(); });
+
+function render(){
+  if(!currentChord) return;
+
+  let data;
+  if(currentMode==='simple'){
+    const positions=currentChord.shape.simplePositions;
+    currentSimpleIndex=Math.min(currentSimpleIndex, Math.max(0,positions.length-1));
+    data=positions[currentSimpleIndex];
+    el.positionPicker.innerHTML='';
+
+    if(!positions.length){
+      el.tabNote.textContent='No encontré una posición fácil sin cejilla para este acorde en los primeros 12 trastes.';
+      el.positionPicker.innerHTML='<div class="position-empty">Este acorde no tiene una forma simplificada que cumpla las reglas de principiante.</div>';
+      el.stringList.innerHTML='';
+      el.fretBadge.textContent='sin posición fácil';
+      if(threeReadyOk && neckGroup) clearGroup(neckGroup);
+      return;
+    }
+
+    el.tabNote.textContent='Todas estas posiciones son fáciles: sin cejilla y con máximo 4 dedos. Toca los botones para verlas.';
+    positions.forEach((pos,i)=>{
+      const b=document.createElement('button');
+      b.type='button';
+      b.className='position-btn'+(i===currentSimpleIndex?' active':'');
+      const label=pos.positionStart===0 ? 'Abierta · 0–3' : `Trastes ${pos.positionStart}–${pos.positionEnd}`;
+      b.textContent=label;
+      b.onclick=()=>{ currentSimpleIndex=i; render(); };
+      el.positionPicker.appendChild(b);
+    });
+  } else {
+    data=currentChord.shape.normal;
+    data.positionStart=Math.max(0,data.barreFret);
+    data.positionEnd=data.barreFret>0 ? data.barreFret+4 : 3;
+    el.positionPicker.innerHTML='';
+    el.tabNote.textContent = currentChord.shape.normal.barreFret>0
+      ? 'Forma normal con cejilla. Se puede mover por el mástil.'
+      : 'Forma normal abierta en posición 0.';
+  }
+
+  const startLabel = data.positionStart===0 ? 'posición abierta' : `trastes ${data.positionStart}–${data.positionEnd}`;
+  el.fretBadge.textContent = startLabel;
+
+  el.stringList.innerHTML='';
+  for(let i=5;i>=0;i--){
+    const fret=data.frets[i];
+    const finger=data.fingers[i];
+    const row=document.createElement('div');
+    row.className='string-row'+(fret===null?' muted':(fret===0?' open':''));
+    let valTxt;
+    if(fret===null) valTxt='no tocar';
+    else if(fret===0) valTxt='al aire';
+    else valTxt='traste '+fret;
+    row.innerHTML=`
+      <span class="snum">${6-i}</span>
+      <span class="sname">${STRING_NAMES[i]}</span>
+      <span class="sval">${valTxt}</span>
+      <span class="finger">${fret===null?'×':(fret===0?'○':(finger||'•'))}</span>
+    `;
+    el.stringList.appendChild(row);
+  }
+  updateNeck3D(data);
+}
+
+/* ============ ESCENA 3D ============ */
+let scene, camera, renderer, neckPanel, neckGroup;
+let dragState = {active:false, lastX:0, lastY:0};
+let rotY = 0.35, rotX = -0.12, autoRotate = true;
+const NUM_FRETS_VISIBLE = 5;
+let threeReadyOk = false;
+
+function showNeckError(msg){
+  const panel = document.getElementById('neckPanel');
+  const box = document.createElement('div');
+  box.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:#e08a6b;font-family:JetBrains Mono, monospace;font-size:12.5px;line-height:1.6;';
+  box.textContent = msg;
+  panel.appendChild(box);
+}
+
+function initThree(){
+  neckPanel = document.getElementById('neckPanel');
+  if(typeof THREE === 'undefined'){
+    showNeckError('No se pudo cargar el motor 3D (three.js) desde internet. Revisa tu conexión o intenta abrir la página desde otro navegador.');
+    return false;
+  }
+  if(!window.WebGLRenderingContext){
+    showNeckError('Este navegador no soporta WebGL, necesario para el mástil 3D.');
+    return false;
+  }
+  if(!neckPanel.style.height){ neckPanel.style.height = neckPanel.clientHeight ? neckPanel.clientHeight+'px' : '340px'; }
+
+  scene = new THREE.Scene();
+  const w = neckPanel.clientWidth || 600, h = neckPanel.clientHeight || 340;
+  camera = new THREE.PerspectiveCamera(38, w/h, 0.1, 100);
+  camera.position.set(0, 1.6, 7.2);
+
+  try{
+    renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  } catch(e){
+    showNeckError('No se pudo iniciar WebGL en este navegador/dispositivo.');
+    return false;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(w,h);
+  neckPanel.appendChild(renderer.domElement);
+
+  const amb = new THREE.AmbientLight(0xfff4e0, 0.65);
+  scene.add(amb);
+  const dir = new THREE.DirectionalLight(0xffe8bd, 0.9);
+  dir.position.set(3,5,4);
+  scene.add(dir);
+  const dir2 = new THREE.DirectionalLight(0x88aaff, 0.25);
+  dir2.position.set(-4,-2,-3);
+  scene.add(dir2);
+
+  neckGroup = new THREE.Group();
+  scene.add(neckGroup);
+
+  const dom = renderer.domElement;
+  dom.style.touchAction = 'none';
+  dom.addEventListener('pointerdown', e=>{
+    dragState.active=true; dragState.lastX=e.clientX; dragState.lastY=e.clientY; autoRotate=false;
+    try{ dom.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  }, {passive:false});
+  dom.addEventListener('pointerup', e=>{
+    dragState.active=false;
+    try{ dom.releasePointerCapture(e.pointerId); }catch(err){}
+  });
+  dom.addEventListener('pointercancel', ()=>{ dragState.active=false; });
+  dom.addEventListener('pointermove', e=>{
+    if(!dragState.active) return;
+    e.preventDefault();
+    const dx = e.clientX - dragState.lastX;
+    const dy = e.clientY - dragState.lastY;
+    rotY += dx*0.01;
+    rotX = Math.max(-0.6, Math.min(0.6, rotX + dy*0.008));
+    dragState.lastX = e.clientX; dragState.lastY = e.clientY;
+  }, {passive:false});
+
+  window.addEventListener('resize', ()=>{
+    const w2 = neckPanel.clientWidth || 600, h2 = neckPanel.clientHeight || 340;
+    camera.aspect = w2/h2; camera.updateProjectionMatrix();
+    renderer.setSize(w2,h2);
+  });
+
+  animate();
+  return true;
+}
+
+function clearGroup(g){ while(g.children.length) g.remove(g.children[0]); }
+
+function updateNeck3D(data){
+  if(!threeReadyOk || !neckGroup) return;
+  clearGroup(neckGroup);
+
+  const startFret = data.positionStart===0 ? 0 : Math.max(1, data.positionStart-1);
+  const fretsToShow = data.positionStart===0 ? 4 : 5;
+  const neckLen = 6.2, neckWidth = 2.0, neckDepth = 0.28;
+
+  const woodMat = new THREE.MeshStandardMaterial({color:0x6b4226, roughness:0.55, metalness:0.05});
+  const fbMat = new THREE.MeshStandardMaterial({color:0x2a1c10, roughness:0.6, metalness:0.05});
+  const fretMat = new THREE.MeshStandardMaterial({color:0xc9c2ad, roughness:0.35, metalness:0.6});
+  const dotMat = new THREE.MeshStandardMaterial({color:0xd9c98a, roughness:0.4, metalness:0.3});
+  const stringMat = new THREE.MeshStandardMaterial({color:0xdedac8, roughness:0.3, metalness:0.7});
+  const pressMat = new THREE.MeshStandardMaterial({color:0xd4622a, roughness:0.3, metalness:0.2, emissive:0x5a230d, emissiveIntensity:0.6});
+  const openMat = new THREE.MeshStandardMaterial({color:0x5b9e88, roughness:0.35, metalness:0.2, emissive:0x123a30, emissiveIntensity:0.5});
+
+  const fb = new THREE.Mesh(new THREE.BoxGeometry(neckLen, neckDepth, neckWidth), woodMat);
+  fb.position.set(0,0,0);
+  neckGroup.add(fb);
+  const fbTop = new THREE.Mesh(new THREE.BoxGeometry(neckLen, 0.03, neckWidth*0.94), fbMat);
+  fbTop.position.set(0, neckDepth/2+0.016, 0);
+  neckGroup.add(fbTop);
+
+  const fretSpacing = neckLen / (fretsToShow+1);
+  const xForFret = (f)=> -neckLen/2 + fretSpacing*0.5 + (f-startFret+0.5)*fretSpacing;
+
+  for(let i=0;i<=fretsToShow;i++){
+    const x = -neckLen/2 + i*fretSpacing;
+    const fretBar = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.045, neckWidth*0.96), fretMat);
+    fretBar.position.set(x, neckDepth/2+0.03, 0);
+    neckGroup.add(fretBar);
+  }
+  if(startFret===0){
+    const nut = new THREE.Mesh(new THREE.BoxGeometry(0.09,0.09,neckWidth*0.98), new THREE.MeshStandardMaterial({color:0xede5d2, roughness:0.4}));
+    nut.position.set(-neckLen/2, neckDepth/2+0.045, 0);
+    neckGroup.add(nut);
+  }
+
+  const markerFrets = [3,5,7,9,12,15,17];
+  markerFrets.forEach(mf=>{
+    if(mf>startFret && mf<=startFret+fretsToShow){
+      const x = xForFret(mf-0.5);
+      const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.02,20), dotMat);
+      dot.position.set(x, neckDepth/2+0.03, 0);
+      neckGroup.add(dot);
+    }
+  });
+
+  addFretLabel(startFret+1, xForFret(startFret+0.5), -neckWidth/2-0.35);
+
+  const stringZs = [-0.85,-0.51,-0.17,0.17,0.51,0.85];
+  const stringRadii = [0.028,0.024,0.02,0.016,0.013,0.011];
+
+  for(let s=0; s<6; s++){
+    const z = stringZs[s];
+    const geo = new THREE.CylinderGeometry(stringRadii[s], stringRadii[s], neckLen, 8);
+    const str = new THREE.Mesh(geo, stringMat);
+    str.rotation.z = Math.PI/2;
+    str.position.set(0, neckDepth/2+0.05, z);
+    neckGroup.add(str);
+
+    const fret = data.frets[s];
+    if(fret===null){
+      const xMark = makeXMark();
+      xMark.position.set(-neckLen/2-0.35, neckDepth/2+0.05, z);
+      neckGroup.add(xMark);
+    } else if(fret===0){
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.09,0.02,10,20), openMat);
+      ring.position.set(-neckLen/2-0.35, neckDepth/2+0.05, z);
+      ring.rotation.x = Math.PI/2;
+      neckGroup.add(ring);
+    } else {
+      const x = xForFret(fret-0.5);
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.1,20,20), pressMat);
+      dot.position.set(x, neckDepth/2+0.12, z);
+      neckGroup.add(dot);
+      const finger = data.fingers[s];
+      if(finger){ addFingerLabel(finger, x, neckDepth/2+0.12, z); }
+    }
+  }
+}
+
+function makeXMark(){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({color:0x8c8172});
+  const bar1 = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.02,0.02), mat);
+  bar1.rotation.z = Math.PI/4;
+  const bar2 = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.02,0.02), mat);
+  bar2.rotation.z = -Math.PI/4;
+  g.add(bar1); g.add(bar2);
+  return g;
+}
+
+function makeTextSprite(text, color){
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = color || '#1c1509';
+  ctx.font = 'bold 42px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 32, 34);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({map:tex, depthTest:false});
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.22,0.22,0.22);
+  return sprite;
+}
+
+function addFingerLabel(finger, x, y, z){
+  const sprite = makeTextSprite(String(finger), '#1c1509');
+  sprite.position.set(x, y+0.001, z);
+  neckGroup.add(sprite);
+}
+
+function addFretLabel(fretNum, x, z){
+  const canvas = document.createElement('canvas');
+  canvas.width=96; canvas.height=48;
+  const ctx = canvas.getContext('2d');
+  ctx.font='bold 28px "JetBrains Mono", monospace';
+  ctx.fillStyle = '#c9a13b';
+  ctx.textAlign='center';
+  ctx.fillText(fretNum, 48, 32);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({map:tex, depthTest:false});
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.5,0.25,0.5);
+  sprite.position.set(x, -0.15, z);
+  neckGroup.add(sprite);
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  if(autoRotate) rotY += 0.0016;
+  if(neckGroup){ neckGroup.rotation.y = rotY; neckGroup.rotation.x = rotX; }
+  if(renderer && scene && camera) renderer.render(scene, camera);
+}
+
+/* ============ AFINADOR ============ */
+const GUITAR_STRINGS = [
+  {label:'6ª · Mi grave', note:'E', octave:2, freq:82.41},
+  {label:'5ª · La',       note:'A', octave:2, freq:110.00},
+  {label:'4ª · Re',       note:'D', octave:3, freq:146.83},
+  {label:'3ª · Sol',      note:'G', octave:3, freq:196.00},
+  {label:'2ª · Si',       note:'B', octave:3, freq:246.94},
+  {label:'1ª · Mi agudo', note:'E', octave:4, freq:329.63}
+];
+
+const tunerEl = {
+  micBtn: document.getElementById('micBtn'),
+  stopBtn: document.getElementById('stopBtn'),
+  start: document.getElementById('tunerStart'),
+  active: document.getElementById('tunerActive'),
+  targetRow: document.getElementById('targetStringRow'),
+  bigNote: document.getElementById('bigNote'),
+  subNote: document.getElementById('subNote'),
+  needle: document.getElementById('needle'),
+  status: document.getElementById('tunerStatus')
+};
+
+GUITAR_STRINGS.forEach((s,i)=>{
+  const pill = document.createElement('span');
+  pill.className = 'string-pill';
+  pill.id = 'pill-'+i;
+  pill.textContent = s.label;
+  tunerEl.targetRow.appendChild(pill);
+});
+
+let audioCtx=null, analyser=null, micStream=null, tunerRAF=null, tunerBuf=null;
+
+function freqToNearestString(freq){
+  let best=null, bestCents=Infinity;
+  GUITAR_STRINGS.forEach((s,i)=>{
+    const cents = 1200*Math.log2(freq/s.freq);
+    if(Math.abs(cents) < Math.abs(bestCents)){ bestCents = cents; best = i; }
+  });
+  return {index:best, cents:bestCents};
+}
+
+function freqToChromaticNote(freq){
+  const midi = 69 + 12*Math.log2(freq/440);
+  const rounded = Math.round(midi);
+  const name = NOTES[(rounded%12+12)%12];
+  const octave = Math.floor(rounded/12)-1;
+  const cents = (midi-rounded)*100;
+  return {name, octave, cents};
+}
+
+// autocorrelación acotada al rango de frecuencias de guitarra (más precisa y más rápida)
+function autoCorrelate(buf, sampleRate){
+  const SIZE = buf.length;
+  let rms = 0;
+  for(let i=0;i<SIZE;i++) rms += buf[i]*buf[i];
+  rms = Math.sqrt(rms/SIZE);
+  if(rms < 0.008) return -1;
+
+  const minLag = Math.max(2, Math.floor(sampleRate/1000));
+  const maxLag = Math.min(SIZE-2, Math.ceil(sampleRate/55));
+
+  const corrAt = (lag)=>{
+    let sum=0;
+    for(let i=0;i<SIZE-lag;i++) sum += buf[i]*buf[i+lag];
+    return sum;
+  };
+
+  let bestLag=-1, bestVal=-Infinity;
+  for(let lag=minLag; lag<=maxLag; lag++){
+    const v = corrAt(lag);
+    if(v>bestVal){ bestVal=v; bestLag=lag; }
+  }
+  if(bestLag<=minLag || bestLag>=maxLag) return sampleRate/bestLag;
+
+  const x1=corrAt(bestLag-1), x2=bestVal, x3=corrAt(bestLag+1);
+  const a=(x1+x3-2*x2)/2, b=(x3-x1)/2;
+  const T0 = a ? bestLag - b/(2*a) : bestLag;
+  return sampleRate/T0;
+}
+
+// suaviza las últimas lecturas con la mediana para evitar saltos y ganar precisión
+const freqHistory = [];
+const FREQ_HISTORY_LEN = 6;
+function smoothFrequency(freq){
+  freqHistory.push(freq);
+  if(freqHistory.length > FREQ_HISTORY_LEN) freqHistory.shift();
+  const sorted = [...freqHistory].sort((a,b)=>a-b);
+  return sorted[Math.floor(sorted.length/2)];
+}
+
+function setNeedle(cents){
+  const clamped = Math.max(-50, Math.min(50, cents));
+  const angle = (clamped/50)*80; // -80..80 grados
+  tunerEl.needle.style.transform = `rotate(${angle}deg)`;
+}
+
+function tunerLoop(){
+  tunerRAF = requestAnimationFrame(tunerLoop);
+  analyser.getFloatTimeDomainData(tunerBuf);
+  const rawFreq = autoCorrelate(tunerBuf, audioCtx.sampleRate);
+  if(rawFreq === -1 || rawFreq < 55 || rawFreq > 1000){
+    tunerEl.status.textContent = 'Escuchando... toca una cuerda';
+    return;
+  }
+  const freq = smoothFrequency(rawFreq);
+  const nearest = freqToNearestString(freq);
+  const gs = GUITAR_STRINGS[nearest.index];
+  const hzDiff = freq - gs.freq;
+
+  document.querySelectorAll('.string-pill').forEach(p=>p.classList.remove('active-target'));
+  document.getElementById('pill-'+nearest.index).classList.add('active-target');
+
+  const noteLabel = NOTE_LABEL_ES[gs.note];
+  tunerEl.bigNote.textContent = noteLabel.charAt(0).toUpperCase()+noteLabel.slice(1);
+  tunerEl.subNote.textContent = gs.label + ' · ' + freq.toFixed(2) + ' Hz (objetivo ' + gs.freq + ' Hz)';
+
+  const absCents = Math.abs(nearest.cents);
+  const inTune = absCents < 4;
+  tunerEl.bigNote.classList.toggle('in-tune', inTune);
+  setNeedle(nearest.cents);
+
+  if(inTune){
+    tunerEl.status.textContent = '✓ Afinada';
+  } else {
+    const action = nearest.cents>0 ? 'destensa (afloja)' : 'tensa (aprieta)';
+    const magnitude = absCents<12 ? 'un poco' : (absCents<25 ? 'bastante' : 'mucho');
+    tunerEl.status.textContent = `${action} ${magnitude} · ${absCents.toFixed(0)} cents (${hzDiff>0?'+':''}${hzDiff.toFixed(1)} Hz)`;
+  }
+}
+
+async function startTuner(){
+  try{
+    micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+  } catch(e){
+    tunerEl.status.textContent = 'No se pudo acceder al micrófono. Revisa los permisos del navegador.';
+    return;
+  }
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  const source = audioCtx.createMediaStreamSource(micStream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 4096;
+  tunerBuf = new Float32Array(analyser.fftSize);
+  source.connect(analyser);
+  freqHistory.length = 0;
+
+  tunerEl.start.classList.add('off');
+  tunerEl.active.classList.add('on');
+  tunerLoop();
+}
+
+function stopTuner(){
+  if(tunerRAF) cancelAnimationFrame(tunerRAF);
+  if(micStream) micStream.getTracks().forEach(t=>t.stop());
+  if(audioCtx) audioCtx.close();
+  audioCtx=null; analyser=null; micStream=null;
+  freqHistory.length = 0;
+  tunerEl.start.classList.remove('off');
+  tunerEl.active.classList.remove('on');
+  tunerEl.bigNote.textContent = '—';
+  tunerEl.bigNote.classList.remove('in-tune');
+  tunerEl.subNote.textContent = 'esperando sonido...';
+  document.querySelectorAll('.string-pill').forEach(p=>p.classList.remove('active-target'));
+  setNeedle(0);
+}
+
+tunerEl.micBtn.onclick = startTuner;
+tunerEl.stopBtn.onclick = stopTuner;
+
+/* ============ INIT ============ */
+window.addEventListener('load', async ()=>{
+  const loaded = await window.__threeReady;
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  if(loaded){ threeReadyOk = initThree(); }
+  else{ showNeckError('No se pudo cargar el motor 3D (three.js) desde internet. Revisa tu conexión e intenta recargar la página.'); }
+  el.input.value = 'Cmaj7';
+  handleSearch();
+});
+</script>
+</body>
+</html>
